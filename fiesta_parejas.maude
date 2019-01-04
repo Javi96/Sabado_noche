@@ -3,6 +3,7 @@
 ***__________________________________________________________________________________________________________________
 
 
+
 fmod FIESTA is
  pr NAT .
  pr STRING .
@@ -20,9 +21,9 @@ fmod FIESTA is
  op vip : -> Tipo [ctor] .
 
  *** ----- Personas ----- 
- op p(_|_|_-_-_|_|_) : String Nat Nat Nat Nat Tipo Nat -> Persona [ctor] .	*** Persona en botellón o cola
  op p(_|_|_|_) : String Nat Tipo Nat -> Nueva [ctor] .						*** Persona en local
-
+ op p(_|_|_-_-_|_|_) : String Nat Nat Nat Nat Tipo Nat -> Persona [ctor] .	*** Persona en botellón o cola.
+ 																			*** nombre | edad | alcohol - refrescos - hielos | tipo | copas
  *** ----- Calle ----- 
  op calleVacia : -> Calle [ctor] .
  op _,_ : Calle Calle -> Calle [ctor assoc comm id: calleVacia] .
@@ -36,7 +37,7 @@ fmod FIESTA is
  op localVacio : -> Aforo [ctor] .
  op _ _ : Aforo Aforo -> Aforo [ctor assoc comm id: localVacio] .
  op _|_|_-_ : Aforo Nat Nat Nat -> Local [ctor] .							*** El control del aforo lo hará un contador de las personas que aún caben 
-
+ 																			*** clientes | afoto | alcohol - refrescos
  *** ----- Fiesta ----- 
  op [_] <_> [_] : Calle Cola Local -> Fiesta [ctor] .
 
@@ -103,22 +104,22 @@ mod COMPORTAMIENTO is
  *** ----- OPERACIONES DE LA COLA -----
 
  *** ----- Persona normal entra a la cola ----- 
- rl [esperaNormal] : [ p( N | X | B1 - B2 - B3 | normal | A ) , C ] < QN >< QV > [ L ] =>						
- 	[ C ] < p( N | X | B1 - B2 - B3 | normal | A ) QN >< QV > [ L ] .											*** Espera al final de la cola normal
-
- *** ----- Persona vip entra a la cola ----- 
- rl [esperaVip] : [ p( N | X | B1 - B2 - B3 | vip | A ) , C ] < QN >< QV > [ L ] =>
- 	[ C ] < QN >< p( N | X | B1 - B2 - B3 | vip | A ) QV > [ L ] .												*** Espera al final de la cola vip
+ rl [esperaNormal] : [ p( N | X | B1 - B2 - B3 | normal | A ) , C ] < QN >< QV > [ L ] =>							*** Espera al final de la cola normal
+ 	[ C ] < p( N | X | B1 - B2 - B3 | normal | A ) QN >< QV > [ L ] .
 
  *** ----- Persona normal entra al local ----- 
- crl [entraNormal] : [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) >< filaVacia > [ D | s(Z) | A' - R ] =>	*** Si no hay VIP esperando
+ crl [entraNormal] : [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) >< filaVacia > [ D | s(Z) | A' - R ] =>		*** Si no hay VIP esperando
 	[ C ] < QN >< filaVacia > [ p( N | X | normal | A ) D | Z | A' - R ]
 	if ( X > 18 ) /\ ( A < 3 ) .																		
 
  *** ----- Persona normal rechazada ----- 
- crl [rechazaNormal] : [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) >< filaVacia > [ D | Z | A' - R ] =>	*** Si no hay VIP esperando
+ crl [rechazaNormal] : [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) >< filaVacia > [ D | Z | A' - R ] =>		*** Si no hay VIP esperando
 	[ C , p( N | X | B1 - B2 - B3 | normal | A ) ] < QN >< filaVacia > [ D | Z | A' - R ]
 	if ( X <= 18 ) or ( A >= 3 ) .
+
+ *** ----- Persona vip entra a la cola ----- 
+ rl [esperaVip] : [ p( N | X | B1 - B2 - B3 | vip | A ) , C ] < QN >< QV > [ L ] =>									*** Espera al final de la cola vip
+ 	[ C ] < QN >< p( N | X | B1 - B2 - B3 | vip | A ) QV > [ L ] .												
 
  *** ----- Persona vip entra al local ----- 
  crl [entraVip] : [ C ] < QN >< QV p( N | X | B1 - B2 - B3 | vip | A ) > [ D | s(Z) | A' - R ] =>
@@ -137,24 +138,25 @@ mod COMPORTAMIENTO is
  *** ----- Beber refresco en local ----- 
  crl [pideRefresco] : p( N | X | T | A ) D | Z | A' - s(R) =>
 	p( N | X | T | A ) D | Z | A' - R
-	if ( N =/= "Dabi" ) .																				*** Dabi no consume
+	if ( N =/= "Dabi" ) .																		*** Dabi no consume
 
  *** ----- Beber cubata en local ----- 
  crl [pideCubata] : p( N | X | T | A ) D | Z | s(A') - s(R) =>
 	p( N | X | T | s(A) ) D | Z | A' - R
-	if ( A <= 3 ) /\ ( N =/= "Dabi" ) .																	*** Dabi no consume
+	if ( A <= 3 ) /\ ( N =/= "Dabi" ) .															*** Dabi no consume
 
  *** ----- Dabi te echa del local ----- 
  crl [echar] : p( "Dabi" | X | T | A ) p( N | X | T | 4 ) D | Z | A' - R =>
 	p( "Dabi" | X | T | A ) D | s(Z) | A' - R
-	if ( N =/= "Dabi" ) .																				*** Dabi no se va
+	if ( N =/= "Dabi" ) .																		*** Dabi no se va
 
  *** ----- Persona se va del local ----- 
  crl [irse] : p( N | X | T | A ) D | Z | A' - R =>
 	D | s(Z) | A' - R
-	if ( N =/= "Dabi" ) .																				*** Dabi no se va
+	if ( N =/= "Dabi" ) .																		*** Dabi no se va
 
 endm
+
 
 ***__________________________________________________________________________________________________________________***
 ***__________________________________________________________________________________________________________________***
@@ -174,7 +176,7 @@ mod EJEMPLO is
 
 endm
 
-frew [20] init .
+*** frew [20] init .
 
 
 ***__________________________________________________________________________________________________________________***
@@ -255,6 +257,7 @@ endm
 ***__________________________________________________________________________________________________________________***
 
 
+
 mod TEST is
  pr LTL-SIMPLIFIER .
  pr MODEL-CHECKER .
@@ -262,6 +265,14 @@ mod TEST is
  pr EJEMPLO .
 
 endm
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
 
 *** "Dabi" siempre está en el local.
 *** red modelCheck ( init, [] estaLocal("Dabi") ) .
@@ -282,8 +293,8 @@ endm
 *** red modelCheck ( init, [] ( estaCola(N:String) -> <> estaLocal(N:String) ) ) .
 *** (
 		No se cumple. Contraejemplo.
-		El cliente menor de edad no entrará en ningún momento al local.
-		CEJ: Kirby (menor) nunca llega a entrar.
+		El cliente menor de edad no entrará en ningún momento al local o Link puede beber de más.
+		CEJ: Kirby (menor) en ningún caso llega a entrar.
 )
 
 *** El alcohol nunca se acaba.
@@ -302,12 +313,11 @@ endm
 )
 
 *** En algún momento alguien bebe de más, y permanece en ese estado para siempre.
-*** red modelCheck ( init, <> [] demasiadaBebida(N:String) ) .
+*** red modelCheck ( init, <> ( demasiadaBebida(N:String) -> [] demasiadaBebida(N:String) ) ) .
 *** (
-		No se cumple. Contraejemplo.
-		Los clientes del local en algún momento serán expulsados y es posible que se agoten los recursos del botellón sin
-		que alguien llegue a beber demasiado.
-		CEJ: todos los posibles clientes han pasado por el local y Kirby se ha quedado con su bolsa (2-2-2) pudiendo tomar como máximo 2 copas.
+		Se cumple.
+		Es posible que Link beba en la cola y llegue a 3 copas, por lo que nunca llegará a entrar en el local y permanecerá en la cola
+		o en el botellón.
 )
 
 *** Si hay hielo, refrescos y alcohol en la zona de botellón, entonces en algún momento alguien bebe de más
@@ -320,17 +330,28 @@ endm
 
 eof
 
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
 *** (
 		EJERCICIO 5:
 
-		Para el botellón: las operaciones no pueden transformarse debido al no determinismo.
+		Para el botellón: 	las operaciones no pueden transformarse debido al no determinismo.
+							"bebeRefresco" colisionaría con "bebeCubata".
+							"bebeRefrescoGorron" colisionaría con "bebeCubataGorron".
 
-		Para la cola: 	las operaciones de entrada a la cola "esperaNormal" y "esperaVip" no pueden transformarse debido al no determinismo.
+		Para la cola: 	las operaciones de entrada a la cola "esperaNormal" y "esperaVip" pueden transformarse en ecuaciones.
 						las operaciones de entrada al local "entraNormal" y "entraVip" pueden transformarse en ecuaciones.
 						las operaciones de rechazo "rechazaNormal" y "rechazaVip" también pueden transformarse.
+						La transformación es posible debido a que realizamos la distinción entre personas normales y vip y tenemos requisitos para controlar el acceso al local. La implementación garantiza la ejecución de una sola regla/ecuación.
 
 		Para el local: 	las operaciones de consumición "pideRefresco" y "pideCubata" no pueden transformarse debido al no determinismo.
-						las operaciones de salida "irse" y "echar" pueden transformarse en ecuaciones.
-
-		Las transformaciones de las reglas mencionadas son posibles debido a que no presentan problemas de sección crítica (irse/echar) o debido a que por su definición se ejecutan necesariamente de manera secuencial (entrada/rechazo del local).
+						las operaciones de salida "irse" y "echar" no pueden transformarse debido al no determinismo.
+						Las operaciones de consumición colisionarían entre sí.
+						las operaciones de salida del local colisionarían entre sí (caso de una persona con 4 copas).
 )
