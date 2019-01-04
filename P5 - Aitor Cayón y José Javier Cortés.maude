@@ -1,0 +1,361 @@
+***__________________________________________________________________________________________________________________
+***	Práctica 5 - Aitor Cayón Ruano y José Javier Cortés Tejada
+***__________________________________________________________________________________________________________________
+
+
+
+fmod FIESTA is
+ pr NAT .
+ pr STRING .
+
+ sorts Nueva Persona Tipo Calle Fila Cola Aforo Local Fiesta .
+
+ subsort Persona < Calle .
+ subsort Persona < Fila .
+ subsort Nueva < Aforo .
+
+ ***__________________________________________________________________________________________________________________
+
+ *** ----- Tipos ----- 
+ op normal : -> Tipo [ctor] .
+ op vip : -> Tipo [ctor] .
+
+ *** ----- Personas ----- 
+ op p(_|_|_|_) : String Nat Tipo Nat -> Nueva [ctor] .						*** Persona en local
+ op p(_|_|_-_-_|_|_) : String Nat Nat Nat Nat Tipo Nat -> Persona [ctor] .	*** Persona en botellón o cola.
+ 																			*** nombre | edad | alcohol - refrescos - hielos | tipo | copas
+ *** ----- Calle ----- 
+ op calleVacia : -> Calle [ctor] .
+ op _,_ : Calle Calle -> Calle [ctor assoc comm id: calleVacia] .
+
+ *** ----- Cola ----- 
+ op filaVacia : -> Fila [ctor] .
+ op _ _ : Fila Fila -> Fila [ctor assoc id: filaVacia] .
+ op _ >< _ : Fila Fila -> Cola [ctor] .										*** Separamos las colas con ">< "para gestionar la entrada normal y vip
+
+ *** ----- Local ----- 
+ op localVacio : -> Aforo [ctor] .
+ op _ _ : Aforo Aforo -> Aforo [ctor assoc comm id: localVacio] .
+ op _|_|_-_ : Aforo Nat Nat Nat -> Local [ctor] .							*** El control del aforo lo hará un contador de las personas que aún caben 
+ 																			*** clientes | afoto | alcohol - refrescos
+ *** ----- Fiesta ----- 
+ op [_] <_> [_] : Calle Cola Local -> Fiesta [ctor] .
+
+ ***__________________________________________________________________________________________________________________
+
+ var P : Nueva .
+ var D : Aforo .
+
+ op aforo : Aforo -> Nat .										*** Calcula el número de personas dentro del local
+ eq aforo( D ) = 0 [owise] .
+ eq aforo( P D ) = 1 + aforo( D ) .
+
+endfm
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
+mod COMPORTAMIENTO is
+ pr NAT .
+ pr STRING .
+ pr FIESTA .
+
+ var N M : String .
+ var X Y Z B1 B2 B3 B1' B2' B3' A A' R : Nat .
+ var T T' : Tipo .
+
+ var C : Calle .
+ var QN QV : Fila .
+ var Q : Cola .
+ var D : Aforo .
+ var L : Local .
+ 
+
+ *** __________________________________________________________________________________________________________________
+
+ *** ----- OPERACIONES DEL BOTELLÓN -----
+
+ *** ----- Beber refresco de bolsa ----- 
+ rl [bebeRefresco] : p( N | X | B1 - s(B2) - s(B3) | T | A ) =>
+ 	p( N | X | B1 - B2 - B3 | T | A ) .
+
+ *** ----- Beber refresco gorroneando ----- 
+ crl [bebeRefrescoGorron] : p( N | X | B1 - s(B2) - B3 | T | A ) , p( M | Y | B1' - B2' - s(B3') | T' | A' ) , C =>
+ 	p( N | X | B1 - B2 - B3 | T | A ) , p( M | Y | B1' - B2' - B3' | T' | A' ) , C
+ 	if ( N =/= M ) .
+
+ *** ----- Beber cubata de bolsa ----- 
+ rl [bebeCubata] : p( N | X | s(B1) - s(B2) - s(B3) | T | A ) =>
+ 	p( N | X | B1 - B2 - B3 | T | s(A) ) .
+
+ *** ----- Beber cubata gorroneando -----
+ crl [bebeCubataGorron] : p( N | X | s(B1) - s(B2) - B3 | T | A ) , p( M | Y | B1' - B2' - s(B3') | T' | A' ) , C =>
+ 	p( N | X | B1 - B2 - B3 | T | A ) , p( M | Y | B1' - B2' - B3' | T' | A' ) , C
+ 	if ( N =/= M ) .
+
+
+ *** __________________________________________________________________________________________________________________
+
+ *** ----- OPERACIONES DE LA COLA -----
+
+ *** ----- Persona normal entra a la cola ----- 
+ rl [esperaNormal] : [ p( N | X | B1 - B2 - B3 | normal | A ) , C ] < QN >< QV > [ L ] =>							*** Espera al final de la cola normal
+ 	[ C ] < p( N | X | B1 - B2 - B3 | normal | A ) QN >< QV > [ L ] .
+
+ *** ----- Persona normal entra al local ----- 
+ crl [entraNormal] : [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) >< filaVacia > [ D | s(Z) | A' - R ] =>		*** Si no hay VIP esperando
+	[ C ] < QN >< filaVacia > [ p( N | X | normal | A ) D | Z | A' - R ]
+	if ( X > 18 ) /\ ( A < 3 ) .																		
+
+ *** ----- Persona normal rechazada ----- 
+ crl [rechazaNormal] : [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) >< filaVacia > [ D | Z | A' - R ] =>		*** Si no hay VIP esperando
+	[ C , p( N | X | B1 - B2 - B3 | normal | A ) ] < QN >< filaVacia > [ D | Z | A' - R ]
+	if ( X <= 18 ) or ( A >= 3 ) .
+
+ *** ----- Persona vip entra a la cola ----- 
+ rl [esperaVip] : [ p( N | X | B1 - B2 - B3 | vip | A ) , C ] < QN >< QV > [ L ] =>									*** Espera al final de la cola vip
+ 	[ C ] < QN >< p( N | X | B1 - B2 - B3 | vip | A ) QV > [ L ] .												
+
+ *** ----- Persona vip entra al local ----- 
+ crl [entraVip] : [ C ] < QN >< QV p( N | X | B1 - B2 - B3 | vip | A ) > [ D | s(Z) | A' - R ] =>
+	[ C ] < QN >< QV > [ p( N | X | vip | A ) D | Z | A' - R ]
+	if ( X > 18 ) /\ ( A < 3 ) .																		
+
+ *** ----- Persona vip rechazada ----- 
+ crl [rechazaVip] : [ C ] < QN >< QV p( N | X | B1 - B2 - B3 | vip | A ) > [ D | Z | A' - R ] =>
+	[ C , p( N | X | B1 - B2 - B3 | vip | A ) ] < QN >< QV > [ D | Z | A' - R ]
+	if ( X <= 18 ) or ( A >= 3 ) .
+
+ *** __________________________________________________________________________________________________________________
+
+ *** ----- OPERACIONES DEL LOCAL -----
+
+ *** ----- Beber refresco en local ----- 
+ crl [pideRefresco] : p( N | X | T | A ) D | Z | A' - s(R) =>
+	p( N | X | T | A ) D | Z | A' - R
+	if ( N =/= "Dabi" ) .																		*** Dabi no consume
+
+ *** ----- Beber cubata en local ----- 
+ crl [pideCubata] : p( N | X | T | A ) D | Z | s(A') - s(R) =>
+	p( N | X | T | s(A) ) D | Z | A' - R
+	if ( A <= 3 ) /\ ( N =/= "Dabi" ) .															*** Dabi no consume
+
+ *** ----- Dabi te echa del local ----- 
+ crl [echar] : p( "Dabi" | X | T | A ) p( N | X | T | 4 ) D | Z | A' - R =>
+	p( "Dabi" | X | T | A ) D | s(Z) | A' - R
+	if ( N =/= "Dabi" ) .																		*** Dabi no se va
+
+ *** ----- Persona se va del local ----- 
+ crl [irse] : p( N | X | T | A ) D | Z | A' - R =>
+	D | s(Z) | A' - R
+	if ( N =/= "Dabi" ) .																		*** Dabi no se va
+
+endm
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
+mod EJEMPLO is
+ pr FIESTA .
+ pr COMPORTAMIENTO .
+ 
+ op init : -> Fiesta .
+ eq init = 	[ p( "Pit" | 20 | 1 - 1 - 0 | normal | 0 ) , p( "Mario" | 24 | 0 - 0 - 0 | vip | 0 ) , p( "Falcon" | 40 | 0 - 0 - 1 | normal | 0 ) ]
+ 			< p( "Kirby" | 14 | 2 - 2 - 2 | normal | 1 ) >< p( "Samus" | 28 | 1 - 1 - 0 | vip | 1 ) p( "Link" | 99 | 1 - 1 - 1 | vip | 2 ) >
+ 			[ p( "Dabi" | 23 | vip | 8 ) | 4 | 6 - 5 ] .
+
+endm
+
+*** frew [20] init .
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
+load model-checker
+
+mod PROPS is
+ pr SATISFACTION .
+ pr FIESTA .
+ pr COMPORTAMIENTO .
+
+ subsort Fiesta < State .
+
+ var Z A R X B1 B2 B3 A' I : Nat .
+ var N : String .
+ var T : Tipo .
+
+ var C : Calle .
+ var QN QN' QV QV' : Fila .
+ var Q : Cola .
+ var D : Aforo .
+ var L : Local .
+
+ *** ----- Comprueba si se ha acabado el alcohol en el local ----- 
+ op noAlcohol : -> Prop [ctor] .
+ eq [ C ] < Q > [ D | Z | 0 - R ] |= noAlcohol = true .
+
+ *** ----- Comprueba si se han acabado los refrescos en el local -----
+ op noRefrescos : -> Prop [ctor] .
+ eq [ C ] < Q > [ D | Z | A - 0 ] |= noRefrescos = true .
+
+ *** ----- Comprueba si alguien con nombre N esta en la cola -----
+ op estaCola : String -> Prop [ctor] .
+ eq [ C ] < QN p( N | X | B1 - B2 - B3 | T | A ) QN' >< QV > [ D | Z | A' - R ] |= estaCola(N) = true .
+ eq [ C ] < QN >< QV p( N | X | B1 - B2 - B3 | T | A ) QV' > [ D | Z | A' - R ] |= estaCola(N) = true .
+
+ *** ----- Comprueba si alguien con nombre N esta en el local -----
+ op estaLocal : String -> Prop [ctor] .
+ eq [ C ] < Q > [ p( N | X | T | A ) D | Z | A' - R ] |= estaLocal(N) = true .
+
+ *** ----- Comprueba si en el local hay menos de I personas -----
+ op hayMenosDe : Nat -> Prop [ctor] .
+ eq [ C ] < Q > [ D | Z | A' - R ] |= hayMenosDe(I) = aforo(D) < I .
+
+ *** ----- Comprueba si una persona N ha bebido de más -----
+ op demasiadaBebida : String -> Prop [ctor] .
+ eq [ C , p( N | X | B1 - B2 - B3 | T | A ) ] < Q > [ L ] |= demasiadaBebida(N) = A >= 3 .
+ eq [ C ] < QN p( N | X | B1 - B2 - B3 | normal | A ) QN' >< QV > [ L ] |= demasiadaBebida(N) = A >= 3 .
+ eq [ C ] < QN >< QV p( N | X | B1 - B2 - B3 | vip | A ) QV' > [ L ] |= demasiadaBebida(N) = A >= 3 .
+ eq [ C ] < Q > [ p( N | X | T | A ) D | Z | A' - R ] |= demasiadaBebida(N) = A >= 4 .
+
+ *** ----- Comprueba si queda hielo en el botellón -----
+ op hayHielo : -> Prop [ctor] .
+ ceq [ C , p( N | X | B1 - B2 - B3 | T | A ) ] < Q > [ L ] |= hayHielo = true
+ 	if B3 > 0 .
+
+ *** ----- Comprueba si quedan refrescos en el botellón -----
+ op hayRefrescos : -> Prop [ctor] .
+ ceq [ C , p( N | X | B1 - B2 - B3 | T | A ) ] < Q > [ L ] |= hayRefrescos = true
+ 	if B2 > 0 .
+
+ *** ----- Comprueba si queda alcohol en el botellón -----
+ op hayAlcohol : -> Prop [ctor] .
+ ceq [ C , p( N | X | B1 - B2 - B3 | T | A ) ] < Q > [ L ] |= hayAlcohol = true
+ 	if B1 > 0 .
+
+endm
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
+mod TEST is
+ pr LTL-SIMPLIFIER .
+ pr MODEL-CHECKER .
+ pr PROPS .
+ pr EJEMPLO .
+
+endm
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
+*** "Dabi" siempre está en el local.
+*** red modelCheck ( init, [] estaLocal("Dabi") ) .
+*** (
+		Se cumple.
+		Dabi nunca va a abandonar el local ni va a ser expulsado de él.
+)
+
+*** Si el aforo no se supera al principio, entonces no se supera nunca.
+*** red modelCheck ( init, hayMenosDe(6) -> [] hayMenosDe(6) ) .
+*** (
+		Se cumple.
+		Si no se supera inicialmente el aforo es imposible superarlo posteriormente. Una vez completo el local los clientes esperarán en la
+		cola hasta que haya sitio disponible.
+)
+
+*** Si alguien está en la cola acaba entrando.
+*** red modelCheck ( init, [] ( estaCola(N:String) -> <> estaLocal(N:String) ) ) .
+*** (
+		No se cumple. Contraejemplo.
+		El cliente menor de edad no entrará en ningún momento al local o Link puede beber de más.
+		CEJ: Kirby (menor) en ningún caso llega a entrar.
+)
+
+*** El alcohol nunca se acaba.
+*** red modelCheck ( init, ~ [] noAlcohol ) .
+*** (
+		Se cumple.
+		Siempre habrá 1 alcohol disponible porque su cantidad es mayor que la de refresco.
+)
+
+*** Los refrescos siempre se acaban.
+*** red modelCheck ( init, [] <> noRefrescos ) .
+*** (
+		No se cumple. Contraejemplo.
+		Si todos los clientes posibles han pasado por el local y los refrescos no se han agotado entonces nunca se agotarán.
+		CEJ: todos los posibles clientes han pasado por el local sin realizar consumiciones.
+)
+
+*** En algún momento alguien bebe de más, y permanece en ese estado para siempre.
+*** red modelCheck ( init, <> [] demasiadaBebida(N:String) ) .
+*** (
+		No se cumple. Contraejemplo.
+		Los clientes del local en algún momento serán expulsados y es posible que se agoten los recursos del botellón sin
+		que alguien llegue a beber demasiado.
+		CEJ: todos los posibles clientes han pasado por el local y Kirby se ha quedado con su bolsa (2-2-2) pudiendo tomar como máximo 2 copas.
+)
+
+*** Si hay hielo, refrescos y alcohol en la zona de botellón, entonces en algún momento alguien bebe de más
+*** red modelCheck ( init, ( hayHielo /\ hayRefrescos /\ hayAlcohol ) -> <> demasiadaBebida(N:String) ) .
+***(
+		No se cumple. Contraejemplo.
+		Es posible que aún habiendo hielo, refrescos y alcohol nadie llegue a beber demasiado.
+		CEJ: todos los posibles clientes han pasado por el local y Kirby se ha quedado con su bolsa (2-2-2) pudiendo tomar como máximo 2 copas.
+)
+
+eof
+
+
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+***__________________________________________________________________________________________________________________***
+
+
+
+*** (
+		EJERCICIO 5:
+
+		Para el botellón: 	las operaciones no pueden transformarse.
+
+							La ejecución concurrente de las operaciones no es posible (ej: 3 personas quieren gorronear el último hielo).
+
+		Para la cola: 	las operaciones de entrada a la cola "esperaNormal" y "esperaVip" no pueden transformarse.
+						las operaciones de entrada al local "entraNormal" y "entraVip" pueden transformarse.
+						las operaciones de rechazo "rechazaNormal" y "rechazaVip" pueden transformarse.
+
+						Las operaciones de entrada a la cola no pueden ejecutarse concurrentemente debido a la necesidad de preservar un orden.
+						Las transformaciones son posibles debido a que la implementación limita que se pueda ejecutar una única regla.
+
+		Para el local: 	las operaciones de consumición "pideRefresco" y "pideCubata" no pueden transformarse.
+						las operaciones de salida "irse" y "echar" pueden transformarse.
+
+						La ejecución concurrente de las operaciones de consumición no es posible (ej: queda 1 refresco y 3 clientes quieren consumir).
+						Las transformaciones son posibles debido a que se pueden ejecutar concurrentemente las instrucciones.
+)
